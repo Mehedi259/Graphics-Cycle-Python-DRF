@@ -5,21 +5,40 @@ from django.http import HttpResponse
 from django.conf import settings
 import pymupdf as fitz  # PyMuPDF
 from PyPDF2 import PdfReader, PdfWriter
-from deep_translator import GoogleTranslator
 from reportlab.pdfgen import canvas
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.ttfonts import TTFont
 import os
 from io import BytesIO
+from fpdf import FPDF
+from openai import OpenAI
+from rest_framework import serializers
+from drf_spectacular.utils import extend_schema
+from drf_spectacular.types import OpenApiTypes
+
+class TranslatePDFRequestSerializer(serializers.Serializer):
+    file = serializers.FileField(help_text="PDF file to translate")
+    source_language = serializers.CharField(help_text="Source language code (e.g., 'en')")
+    target_language = serializers.CharField(help_text="Target language code (e.g., 'bn')")
+
+class WatermarkPDFRequestSerializer(serializers.Serializer):
+    file = serializers.FileField(help_text="PDF file to watermark")
+    text = serializers.CharField(help_text="Watermark text")
+    position = serializers.CharField(help_text="Position (e.g., center, top-left, bottom-right)")
+    opacity = serializers.FloatField(help_text="Opacity between 0.0 and 1.0")
+    color = serializers.CharField(help_text="Color in hex format (e.g., #FF0000)")
 
 # Register Bengali Font
 FONT_PATH = os.path.join(settings.BASE_DIR, 'editor', 'fonts', 'Kalpurush.ttf')
-if os.path.exists(FONT_PATH):
-    pdfmetrics.registerFont(TTFont('Kalpurush', FONT_PATH))
 
 class TranslatePDFView(APIView):
+    @extend_schema(
+        request={
+            "multipart/form-data": TranslatePDFRequestSerializer
+        },
+        responses={
+            (200, 'application/pdf'): OpenApiTypes.BINARY,
+        },
+        description="Translate a PDF file to another language. Returns a translated PDF file."
+    )
     def post(self, request, *args, **kwargs):
         pdf_file = request.FILES.get('file')
         source_lang = request.data.get('source_language')
@@ -37,38 +56,73 @@ class TranslatePDFView(APIView):
                 if text.strip():
                     extracted_texts.append(text)
 
-            # 2. Translate text
-            translator = GoogleTranslator(source=source_lang, target=target_lang)
+            # 2. Translate text using OpenAI GPT
+            client = OpenAI(api_key=settings.OPENAI_API_KEY)
+            model = settings.OPENAI_MODEL
+
+            # Language name map for clearer GPT prompts
+            lang_names = {
+                'en': 'English', 'bn': 'Bengali', 'ar': 'Arabic', 'fr': 'French',
+                'de': 'German', 'es': 'Spanish', 'hi': 'Hindi', 'zh': 'Chinese',
+                'ja': 'Japanese', 'ko': 'Korean', 'pt': 'Portuguese', 'ru': 'Russian',
+            }
+            src_name = lang_names.get(source_lang, source_lang)
+            tgt_name = lang_names.get(target_lang, target_lang)
+
             translated_texts = []
             for text in extracted_texts:
+                # Split into max 4000-char chunks
                 chunks = [text[i:i+4000] for i in range(0, len(text), 4000)]
                 for chunk in chunks:
-                    translated = translator.translate(chunk)
-                    if translated:
-                        translated_texts.append(translated)
+                    chunk = chunk.strip()
+                    if not chunk:
+                        continue
+                    try:
+                        response = client.chat.completions.create(
+                            model=model,
+                            messages=[
+                                {
+                                    "role": "system",
+                                    "content": (
+                                        f"You are a professional translator. "
+                                        f"Translate the following text from {src_name} to {tgt_name}. "
+                                        f"Preserve the original formatting and line breaks as much as possible. "
+                                        f"Only return the translated text, nothing else."
+                                    )
+                                },
+                                {"role": "user", "content": chunk}
+                            ],
+                            temperature=0.3,
+                        )
+                        translated = response.choices[0].message.content.strip()
+                        if translated:
+                            translated_texts.append(translated)
+                    except Exception as e:
+                        # Fallback: keep original text if translation fails
+                        translated_texts.append(chunk)
 
-            # 3. Generate new PDF
-            buffer = BytesIO()
-            pdf = SimpleDocTemplate(buffer)
-            styles = getSampleStyleSheet()
-            
-            font_name = 'Kalpurush' if target_lang == 'bn' and os.path.exists(FONT_PATH) else 'Helvetica'
-            
-            custom_style = ParagraphStyle(
-                name='Custom',
-                fontName=font_name,
-                fontSize=12,
-                leading=16,
-                wordWrap='CJK' if target_lang == 'bn' else None
-            )
 
-            story = []
+            # 3. Generate new PDF using fpdf2
+            pdf = FPDF()
+            pdf.add_page()
+            
+            # Setup font
+            if target_lang == 'bn' and os.path.exists(FONT_PATH):
+                pdf.add_font("Kalpurush", "", FONT_PATH)
+                pdf.set_font("Kalpurush", size=12)
+            else:
+                pdf.set_font("Helvetica", size=12)
+            
+            # Enable text shaping for CTL scripts like Bengali (requires uharfbuzz)
+            if hasattr(pdf, 'set_text_shaping'):
+                pdf.set_text_shaping(True)
+
             for text in translated_texts:
-                p = Paragraph(text.replace('\n', '<br/>'), custom_style)
-                story.append(p)
-                story.append(Spacer(1, 12))
+                pdf.multi_cell(0, 8, text, align="L")
+                pdf.ln(4)
 
-            pdf.build(story)
+            # Output to buffer
+            buffer = BytesIO(pdf.output())
             buffer.seek(0)
 
             # 4. Return as downloadable file
@@ -81,6 +135,15 @@ class TranslatePDFView(APIView):
 
 
 class WatermarkPDFView(APIView):
+    @extend_schema(
+        request={
+            "multipart/form-data": WatermarkPDFRequestSerializer
+        },
+        responses={
+            (200, 'application/pdf'): OpenApiTypes.BINARY,
+        },
+        description="Add a watermark to a PDF file. Returns the watermarked PDF file."
+    )
     def post(self, request, *args, **kwargs):
         pdf_file = request.FILES.get('file')
         text = request.data.get('text')
