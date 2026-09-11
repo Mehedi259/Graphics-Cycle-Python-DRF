@@ -1,0 +1,106 @@
+{
+	"info": {
+		"_postman_id": "05a2dfcf-c793-4a0b-97e3-0c48ccbb2b21",
+		"name": "PDF Editor APIs",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Translate PDF",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "formdata",
+					"formdata": [
+						{
+							"key": "file",
+							"type": "file",
+							"src": []
+						},
+						{
+							"key": "source_language",
+							"value": "en",
+							"type": "text"
+						},
+						{
+							"key": "target_language",
+							"value": "bn",
+							"type": "text"
+						}
+					]
+				},
+				"url": {
+					"raw": "http://127.0.0.1:8000/api/translate-pdf",
+					"protocol": "http",
+					"host": [
+						"127",
+						"0",
+						"0",
+						"1"
+					],
+					"port": "8000",
+					"path": [
+						"api",
+						"translate-pdf"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Watermark PDF",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "formdata",
+					"formdata": [
+						{
+							"key": "file",
+							"type": "file",
+							"src": []
+						},
+						{
+							"key": "text",
+							"value": "CONFIDENTIAL",
+							"type": "text"
+						},
+						{
+							"key": "position",
+							"value": "center",
+							"type": "text"
+						},
+						{
+							"key": "opacity",
+							"value": "0.5",
+							"type": "text"
+						},
+						{
+							"key": "color",
+							"value": "#FF0000",
+							"type": "text"
+						}
+					]
+				},
+				"url": {
+					"raw": "http://127.0.0.1:8000/editor/pdf/watermark",
+					"protocol": "http",
+					"host": [
+						"127",
+						"0",
+						"0",
+						"1"
+					],
+					"port": "8000",
+					"path": [
+						"editor",
+						"pdf",
+						"watermark"
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}
