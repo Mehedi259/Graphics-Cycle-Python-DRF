@@ -25,7 +25,7 @@ SECRET_KEY = 'django-insecure-p*^4!av=-pijotl8hjk*qc3q2qi)lm@je7&&l+5g$xqbr#_s@@
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']
 
 
 # Application definition
@@ -38,6 +38,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',
+    'drf_spectacular',
     'editor',
 ]
 
@@ -127,3 +128,7 @@ MAILERS = {
         'BACKEND': 'django.core.mail.backends.console.EmailBackend',
     },
 }
+
+REST_FRAMEWORK = {'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema'}
+SPECTACULAR_SETTINGS = {'TITLE': 'PDF Editor API', 'DESCRIPTION': 'API documentation for PDF Translator and Watermark.', 'VERSION': '1.0.0'}
+

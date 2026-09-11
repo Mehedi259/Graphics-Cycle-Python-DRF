@@ -1,0 +1,12 @@
+version: "3.8"
+
+services:
+  pdf_backend:
+    build: .
+    image: graphics-cycle-backend:latest
+    container_name: graphics_cycle_backend
+    restart: always
+    ports:
+      - "8001:8000"
+    env_file:
+      - .env
