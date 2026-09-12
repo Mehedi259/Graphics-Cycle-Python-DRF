@@ -131,7 +131,32 @@ MAILERS = {
 }
 
 REST_FRAMEWORK = {'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema'}
-SPECTACULAR_SETTINGS = {'TITLE': 'PDF Editor API', 'DESCRIPTION': 'API documentation for PDF Translator and Watermark.', 'VERSION': '1.0.0'}
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'Graphics Cycle PDF Editor API',
+    'DESCRIPTION': (
+        '## Made by **Mehedi Hasan Mridul**\n\n'
+        'A powerful PDF editing API that supports:\n\n'
+        '- 📄 **PDF Translation** — Translate any PDF to multiple languages using AI (GPT-4o-mini)\n'
+        '- 💧 **PDF Watermarking** — Add custom watermarks with configurable text, position, opacity and color\n\n'
+        '---\n'
+        '_Select the endpoint below, click **Try it out**, choose your PDF file and fill in the fields, then click **Execute**._'
+    ),
+    'VERSION': '1.0.0',
+    'CONTACT': {
+        'name': 'Mehedi Hasan Mridul',
+        'email': 'mmridul207@gmail.com',
+    },
+    'LICENSE': {'name': 'Private'},
+    'SWAGGER_UI_SETTINGS': {
+        'deepLinking': True,
+        'persistAuthorization': True,
+        'displayOperationId': False,
+        'defaultModelsExpandDepth': 0,
+        'defaultModelExpandDepth': 2,
+        'tryItOutEnabled': True,
+    },
+    'COMPONENT_SPLIT_REQUEST': True,
+}
 
 # OpenAI
 OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '')

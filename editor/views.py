@@ -11,25 +11,81 @@ from io import BytesIO
 from fpdf import FPDF
 from openai import OpenAI
 from rest_framework import serializers
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import extend_schema, OpenApiExample
 from drf_spectacular.types import OpenApiTypes
+from rest_framework.renderers import BaseRenderer, JSONRenderer
+
+class PDFRenderer(BaseRenderer):
+    media_type = 'application/pdf'
+    format = 'pdf'
+    charset = None
+    render_style = 'binary'
+
+    def render(self, data, accepted_media_type=None, renderer_context=None):
+        return data
+
+
+LANGUAGE_HELP = (
+    "Language code. Options: "
+    "en (English), bn (Bengali), ar (Arabic), "
+    "es (Spanish), fr (French), de (German), "
+    "hi (Hindi), zh (Chinese), ja (Japanese), ko (Korean)"
+)
+
+POSITION_HELP = (
+    "Watermark position. Options: "
+    "center, top-left, top-center, top-right, "
+    "bottom-left, bottom-center, bottom-right"
+)
 
 class TranslatePDFRequestSerializer(serializers.Serializer):
-    file = serializers.FileField(help_text="PDF file to translate")
-    source_language = serializers.CharField(help_text="Source language code (e.g., 'en')")
-    target_language = serializers.CharField(help_text="Target language code (e.g., 'bn')")
+    file = serializers.FileField(
+        help_text="Click 'Choose File' to upload a PDF document"
+    )
+    source_language = serializers.CharField(
+        default='en',
+        initial='en',
+        help_text=LANGUAGE_HELP,
+    )
+    target_language = serializers.CharField(
+        default='bn',
+        initial='bn',
+        help_text=LANGUAGE_HELP,
+    )
 
 class WatermarkPDFRequestSerializer(serializers.Serializer):
-    file = serializers.FileField(help_text="PDF file to watermark")
-    text = serializers.CharField(help_text="Watermark text")
-    position = serializers.CharField(help_text="Position (e.g., center, top-left, bottom-right)")
-    opacity = serializers.FloatField(help_text="Opacity between 0.0 and 1.0")
-    color = serializers.CharField(help_text="Color in hex format (e.g., #FF0000)")
+    file = serializers.FileField(
+        help_text="Click 'Choose File' to upload a PDF document"
+    )
+    text = serializers.CharField(
+        default='CONFIDENTIAL',
+        initial='CONFIDENTIAL',
+        help_text="Text to stamp on the PDF (e.g., CONFIDENTIAL, DRAFT, APPROVED)",
+    )
+    position = serializers.CharField(
+        default='center',
+        initial='center',
+        help_text=POSITION_HELP,
+    )
+    opacity = serializers.FloatField(
+        default=0.3,
+        initial=0.3,
+        min_value=0.0,
+        max_value=1.0,
+        help_text="Transparency level — 0.0 (invisible) to 1.0 (fully opaque). Default: 0.3",
+    )
+    color = serializers.CharField(
+        default='#FF0000',
+        initial='#FF0000',
+        help_text="Watermark color in hex format (e.g., #FF0000 for red, #0000FF for blue)",
+    )
 
 # Register Bengali Font
 FONT_PATH = os.path.join(settings.BASE_DIR, 'editor', 'fonts', 'Kalpurush.ttf')
 
 class TranslatePDFView(APIView):
+    renderer_classes = [JSONRenderer, PDFRenderer]
+
     @extend_schema(
         request={
             "multipart/form-data": TranslatePDFRequestSerializer
@@ -37,7 +93,21 @@ class TranslatePDFView(APIView):
         responses={
             (200, 'application/pdf'): OpenApiTypes.BINARY,
         },
-        description="Translate a PDF file to another language. Returns a translated PDF file."
+        description=(
+            "Upload a PDF file and specify source and target language codes.\n\n"
+            "The API will extract text, translate it using AI (GPT-4o-mini), "
+            "and return a translated PDF.\n\n"
+            "**Language codes:** en, bn, ar, es, fr, de, hi, zh, ja, ko"
+        ),
+        examples=[
+            OpenApiExample(
+                'Bengali Translation',
+                summary='Translate English PDF to Bengali',
+                description='Standard example: translate an English document to Bengali',
+                value={'source_language': 'en', 'target_language': 'bn'},
+                request_only=True,
+            ),
+        ],
     )
     def post(self, request, *args, **kwargs):
         pdf_file = request.FILES.get('file')
@@ -46,6 +116,13 @@ class TranslatePDFView(APIView):
 
         if not all([pdf_file, source_lang, target_lang]):
             return Response({"error": "Missing required fields (file, source_language, target_language)."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Validate that the file is actually a PDF
+        if not pdf_file.name.lower().endswith('.pdf'):
+            return Response({"error": f"Invalid file type. Expected a PDF file, but got {pdf_file.name}"}, status=status.HTTP_400_BAD_REQUEST)
+
+        if pdf_file.content_type not in ['application/pdf', 'application/x-pdf']:
+            return Response({"error": f"Invalid content type: {pdf_file.content_type}. Please upload a valid PDF document."}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             # 1. Extract text
@@ -135,6 +212,8 @@ class TranslatePDFView(APIView):
 
 
 class WatermarkPDFView(APIView):
+    renderer_classes = [JSONRenderer, PDFRenderer]
+
     @extend_schema(
         request={
             "multipart/form-data": WatermarkPDFRequestSerializer
@@ -142,7 +221,26 @@ class WatermarkPDFView(APIView):
         responses={
             (200, 'application/pdf'): OpenApiTypes.BINARY,
         },
-        description="Add a watermark to a PDF file. Returns the watermarked PDF file."
+        description=(
+            "Upload a PDF file and configure the watermark settings.\\n\\n"
+            "The API will stamp the watermark text on every page and return the watermarked PDF.\\n\\n"
+            "**Position options:** center, top-left, top-center, top-right, bottom-left, bottom-center, bottom-right\\n\\n"
+            "**Color:** Use hex format — e.g., `#FF0000` (red), `#0000FF` (blue), `#808080` (gray)"
+        ),
+        examples=[
+            OpenApiExample(
+                'Confidential Watermark',
+                summary='Add a red CONFIDENTIAL watermark to center',
+                description='Standard example: stamp CONFIDENTIAL in red at center with 30% opacity',
+                value={
+                    'text': 'CONFIDENTIAL',
+                    'position': 'center',
+                    'opacity': 0.3,
+                    'color': '#FF0000',
+                },
+                request_only=True,
+            ),
+        ],
     )
     def post(self, request, *args, **kwargs):
         pdf_file = request.FILES.get('file')
@@ -153,6 +251,13 @@ class WatermarkPDFView(APIView):
 
         if not all([pdf_file, text, position, opacity, color_hex]):
             return Response({"error": "Missing required fields."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Validate that the file is actually a PDF
+        if not pdf_file.name.lower().endswith('.pdf'):
+            return Response({"error": f"Invalid file type. Expected a PDF file, but got {pdf_file.name}"}, status=status.HTTP_400_BAD_REQUEST)
+
+        if pdf_file.content_type not in ['application/pdf', 'application/x-pdf']:
+            return Response({"error": f"Invalid content type: {pdf_file.content_type}. Please upload a valid PDF document."}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             opacity = float(opacity)
