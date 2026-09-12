@@ -1,0 +1,121 @@
+{
+  "info": {
+    "name": "Graphics Cycle PDF API",
+    "description": "API collection for translating and watermarking PDF files",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Translate PDF",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/pdf"
+          }
+        ],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "file",
+              "type": "file",
+              "description": "The PDF file to translate"
+            },
+            {
+              "key": "source_language",
+              "value": "en",
+              "type": "text",
+              "description": "Source language code (e.g., en)"
+            },
+            {
+              "key": "target_language",
+              "value": "bn",
+              "type": "text",
+              "description": "Target language code (e.g., bn)"
+            }
+          ]
+        },
+        "url": {
+          "raw": "http://178.156.229.53:8001/api/translate-pdf",
+          "protocol": "http",
+          "host": [
+            "178",
+            "156",
+            "229",
+            "53"
+          ],
+          "port": "8001",
+          "path": [
+            "api",
+            "translate-pdf"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Watermark PDF",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/pdf"
+          }
+        ],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "file",
+              "type": "file",
+              "description": "The PDF file to watermark"
+            },
+            {
+              "key": "text",
+              "value": "CONFIDENTIAL",
+              "type": "text"
+            },
+            {
+              "key": "position",
+              "value": "center",
+              "type": "text",
+              "description": "Options: center, top-left, top-center, top-right, bottom-left, bottom-center, bottom-right"
+            },
+            {
+              "key": "opacity",
+              "value": "0.3",
+              "type": "text",
+              "description": "Opacity between 0.0 and 1.0"
+            },
+            {
+              "key": "color",
+              "value": "#FF0000",
+              "type": "text",
+              "description": "Hex color code (e.g., #FF0000)"
+            }
+          ]
+        },
+        "url": {
+          "raw": "http://178.156.229.53:8001/editor/pdf/watermark",
+          "protocol": "http",
+          "host": [
+            "178",
+            "156",
+            "229",
+            "53"
+          ],
+          "port": "8001",
+          "path": [
+            "editor",
+            "pdf",
+            "watermark"
+          ]
+        }
+      },
+      "response": []
+    }
+  ]
+}
